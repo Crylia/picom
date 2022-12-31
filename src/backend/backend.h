@@ -16,6 +16,8 @@
 typedef struct session session_t;
 struct managed_win;
 
+struct backend_shadow_context;
+
 struct ev_loop;
 struct backend_operations;
 
@@ -29,6 +31,15 @@ typedef struct backend_base {
 	bool busy;
 	// ...
 } backend_t;
+
+typedef struct geometry {
+	int width;
+	int height;
+} geometry_t;
+
+typedef struct coord {
+	int x, y;
+} coord_t;
 
 typedef void (*backend_ready_callback_t)(void *);
 
@@ -44,8 +55,8 @@ enum device_status {
 // When image properties are actually applied to the image, they are applied in a
 // particular order:
 //
-// Color inversion -> Dimming -> Opacity multiply -> Limit maximum brightness
-// (Corner radius could be applied in any order)
+// Corner radius -> Color inversion -> Dimming -> Opacity multiply -> Limit maximum
+// brightness
 enum image_properties {
 	// Whether the color of the image is inverted
 	// 1 boolean, default: false
@@ -158,24 +169,30 @@ struct backend_operations {
 	void (*prepare)(backend_t *backend_data, const region_t *reg_damage);
 
 	/**
-	 * Paint the content of an image onto the rendering buffer
+	 * Paint the content of an image onto the rendering buffer.
 	 *
 	 * @param backend_data the backend data
 	 * @param image_data   the image to paint
 	 * @param dst_x, dst_y the top left corner of the image in the target
+	 * @param mask         the mask image, the top left of the mask is aligned with
+	 *                     the top left of the image
 	 * @param reg_paint    the clip region, in target coordinates
 	 * @param reg_visible  the visible region, in target coordinates
 	 */
-	void (*compose)(backend_t *backend_data, void *image_data, int dst_x, int dst_y,
-	                const region_t *reg_paint, const region_t *reg_visible);
+	void (*compose)(backend_t *backend_data, void *image_data, coord_t image_dst,
+	                void *mask, coord_t mask_dst, const region_t *reg_paint,
+	                const region_t *reg_visible);
 
 	/// Fill rectangle of the rendering buffer, mostly for debug purposes, optional.
 	void (*fill)(backend_t *backend_data, struct color, const region_t *clip);
 
 	/// Blur a given region of the rendering buffer.
-	bool (*blur)(backend_t *backend_data, double opacity, void *blur_ctx,
-	             const region_t *reg_blur, const region_t *reg_visible)
-	    attr_nonnull(1, 3, 4, 5);
+	///
+	/// The blur is limited by `mask`. `mask_dst` specifies the top left corner of the
+	/// mask is.
+	bool (*blur)(backend_t *backend_data, double opacity, void *blur_ctx, void *mask,
+	             coord_t mask_dst, const region_t *reg_blur,
+	             const region_t *reg_visible) attr_nonnull(1, 3, 4, 6, 7);
 
 	/// Update part of the back buffer with the rendering buffer, then present the
 	/// back buffer onto the target window (if not back buffered, update part of the
@@ -198,10 +215,43 @@ struct backend_operations {
 	void *(*bind_pixmap)(backend_t *backend_data, xcb_pixmap_t pixmap,
 	                     struct xvisual_info fmt, bool owned);
 
-	/// Create a shadow image based on the parameters
+	/// Create a shadow context for rendering shadows with radius `radius`.
+	/// Default implementation: default_backend_create_shadow_context
+	struct backend_shadow_context *(*create_shadow_context)(backend_t *backend_data,
+	                                                        double radius);
+	/// Destroy a shadow context
+	/// Default implementation: default_backend_destroy_shadow_context
+	void (*destroy_shadow_context)(backend_t *backend_data,
+	                               struct backend_shadow_context *ctx);
+
+	/// Create a shadow image based on the parameters. Resulting image should have a
+	/// size of `width + radisu * 2` x `height + radius * 2`. Radius is set when the
+	/// shadow context is created.
 	/// Default implementation: default_backend_render_shadow
+	///
+	/// Required.
 	void *(*render_shadow)(backend_t *backend_data, int width, int height,
-	                       const conv *kernel, double r, double g, double b, double a);
+	                       struct backend_shadow_context *ctx, struct color color);
+
+	/// Create a shadow by blurring a mask. `size` is the size of the blur. The
+	/// backend can use whichever blur method is the fastest. The shadow produced
+	/// shoule be consistent with `render_shadow`.
+	///
+	/// Optional.
+	void *(*shadow_from_mask)(backend_t *backend_data, void *mask,
+	                          struct backend_shadow_context *ctx, struct color color);
+
+	/// Create a mask image from region `reg`. This region can be used to create
+	/// shadow, or used as a mask for composing. When used as a mask, it should mask
+	/// out everything that is not inside the region used to create it.
+	///
+	/// Image properties might be set on masks too, at least the INVERTED and
+	/// CORNER_RADIUS properties must be supported. Inversion should invert the inside
+	/// and outside of the mask. Corner radius should exclude the corners from the
+	/// mask. Corner radius should be applied before the inversion.
+	///
+	/// Required.
+	void *(*make_mask)(backend_t *backend_data, geometry_t size, const region_t *reg);
 
 	// ============ Resource management ===========
 

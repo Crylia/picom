@@ -1,4 +1,4 @@
-project('picom', 'c', version: '9',
+project('picom', 'c', version: '10',
         default_options: ['c_std=c11', 'warning_level=1'])
 
 cc = meson.get_compiler('c')
@@ -15,7 +15,7 @@ if git.found()
 	endif
 endif
 
-add_global_arguments('-DCOMPTON_VERSION="'+version+'"', language: 'c')
+add_global_arguments('-DPICOM_VERSION="'+version+'"', language: 'c')
 
 if get_option('buildtype') == 'release'
 	add_global_arguments('-DNDEBUG', language: 'c')
@@ -57,7 +57,7 @@ if get_option('warning_level') != '0'
   warns = [ 'cast-function-type', 'ignored-qualifiers', 'missing-parameter-type',
             'nonnull', 'shadow', 'no-type-limits', 'old-style-declaration', 'override-init',
             'sign-compare', 'type-limits', 'uninitialized', 'shift-negative-value',
-            'unused-but-set-parameter', 'unused-parameter', 'implicit-fallthrough',
+            'unused-but-set-parameter', 'unused-parameter', 'implicit-fallthrough=2',
             'no-unknown-warning-option', 'no-missing-braces', 'conversion', 'empty-body' ]
   foreach w : warns
           if cc.has_argument('-W'+w)

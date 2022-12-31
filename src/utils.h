@@ -82,39 +82,39 @@ safe_isnan(double a) {
 
 #define to_int_checked(val)                                                              \
 	({                                                                               \
-		int64_t tmp = (val);                                                     \
-		ASSERT_IN_RANGE(tmp, INT_MIN, INT_MAX);                                  \
-		(int)tmp;                                                                \
+		int64_t __to_tmp = (val);                                                \
+		ASSERT_IN_RANGE(__to_tmp, INT_MIN, INT_MAX);                             \
+		(int)__to_tmp;                                                           \
 	})
 
 #define to_char_checked(val)                                                             \
 	({                                                                               \
-		int64_t tmp = (val);                                                     \
-		ASSERT_IN_RANGE(tmp, CHAR_MIN, CHAR_MAX);                                \
-		(char)tmp;                                                               \
+		int64_t __to_tmp = (val);                                                \
+		ASSERT_IN_RANGE(__to_tmp, CHAR_MIN, CHAR_MAX);                           \
+		(char)__to_tmp;                                                          \
 	})
 
 #define to_u16_checked(val)                                                              \
 	({                                                                               \
-		auto tmp = (val);                                                        \
-		ASSERT_IN_RANGE(tmp, 0, UINT16_MAX);                                     \
-		(uint16_t) tmp;                                                          \
+		auto __to_tmp = (val);                                                   \
+		ASSERT_IN_RANGE(__to_tmp, 0, UINT16_MAX);                                \
+		(uint16_t) __to_tmp;                                                     \
 	})
 
 #define to_i16_checked(val)                                                              \
 	({                                                                               \
-		int64_t tmp = (val);                                                     \
-		ASSERT_IN_RANGE(tmp, INT16_MIN, INT16_MAX);                              \
-		(int16_t) tmp;                                                           \
+		int64_t __to_tmp = (val);                                                \
+		ASSERT_IN_RANGE(__to_tmp, INT16_MIN, INT16_MAX);                         \
+		(int16_t) __to_tmp;                                                      \
 	})
 
 #define to_u32_checked(val)                                                              \
 	({                                                                               \
-		auto tmp = (val);                                                        \
+		auto __to_tmp = (val);                                                   \
 		int64_t max attr_unused = UINT32_MAX; /* silence clang tautological      \
 		                                         comparison warning*/            \
-		ASSERT_IN_RANGE(tmp, 0, max);                                            \
-		(uint32_t) tmp;                                                          \
+		ASSERT_IN_RANGE(__to_tmp, 0, max);                                       \
+		(uint32_t) __to_tmp;                                                     \
 	})
 /**
  * Normalize an int value to a specific range.
@@ -288,6 +288,21 @@ static inline void free_charpp(char **str) {
 /// ref: https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
 ///
 int next_power_of_two(int n);
+
+struct rolling_max;
+
+struct rolling_max *rolling_max_new(int window_size);
+void rolling_max_free(struct rolling_max *rm);
+void rolling_max_reset(struct rolling_max *rm);
+void rolling_max_push(struct rolling_max *rm, int val);
+int rolling_max_get_max(struct rolling_max *rm);
+
+struct rolling_avg;
+struct rolling_avg *rolling_avg_new(int window_size);
+void rolling_avg_free(struct rolling_avg *ra);
+void rolling_avg_reset(struct rolling_avg *ra);
+void rolling_avg_push(struct rolling_avg *ra, int val);
+double rolling_avg_get_avg(struct rolling_avg *ra);
 
 // Some versions of the Android libc do not have timespec_get(), use
 // clock_gettime() instead.
